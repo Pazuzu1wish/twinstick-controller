@@ -35,7 +35,11 @@ public class ControllerView extends View {
     private int buttons; // 16-bit mask (bits 0,1,3,4,6-11,13,14 used)
 
     public byte[] buildReport() {
-        return HidReport.build(stickLX, stickLY, stickRX, stickRY, hat, buttons);
+        // L2/R2 are dual-reported: digital button bits (BTN_TL2/BTN_TR2) plus
+        // analog trigger axes (255 pressed / 0 released).
+        int trigL2 = (buttons & (1 << HidReport.BTN_L2)) != 0 ? 255 : 0;
+        int trigR2 = (buttons & (1 << HidReport.BTN_R2)) != 0 ? 255 : 0;
+        return HidReport.build(stickLX, stickLY, stickRX, stickRY, trigL2, trigR2, hat, buttons);
     }
 
     // ---- geometry ----

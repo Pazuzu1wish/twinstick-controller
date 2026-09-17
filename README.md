@@ -16,10 +16,11 @@ zero extra code.
 - Left stick (X/Y) and right stick (Z/Rz)
 - D-pad (hat switch)
 - Face buttons: A B X Y (bottom/right/left/top diamond)
-- L1 / L2 / R1 / R2 shoulder buttons (digital)
+- L1 / R1 shoulder buttons (digital)
+- L2 / R2 triggers: analog axes (0–255) **and** digital buttons
 - Start / Select, L3 / R3 stick clicks
 
-**HID layout** (v1.0, Report ID 1 — known-good baseline)
+**HID layout** (Report ID 1, 9 data bytes)
 
 | SDL axis | Linux evdev | Control |
 |---|---|---|
@@ -27,6 +28,25 @@ zero extra code.
 | 1 | ABS_Y (−127..127) | Left stick Y |
 | 2 | ABS_Z (−127..127) | Right stick X |
 | 3 | ABS_RZ (−127..127) | Right stick Y |
+| — | ABS_BRAKE (0..255) | L2 trigger (analog) |
+| — | ABS_GAS (0..255) | R2 trigger (analog) |
+
+SDL3's Linux gamepad heuristic maps LEFTTRIGGER ← ABS_BRAKE and RIGHTTRIGGER ←
+ABS_GAS, which is exactly how our triggers are reported (HID Simulation-page
+usages 0xC5 "Brake" and 0xC4 "Accelerator", logical 0..255). The right stick
+stays put on ABS_Z/ABS_RZ — the earlier v1.1 experiment moved it to SDL axes
+3/4 and that broke in-game right-stick look, so don't do that again.
+
+L2/R2 are dual-reported: analog axes *and* digital button bits (8/9 →
+BTN_TL2/BTN_TR2). The Linux Gamepad Specification allows both:
+"Trigger buttons can be available as digital or analog buttons or both."
+
+A note on X/Y: action buttons are reported **by physical position** per the
+Linux Gamepad Specification ("reported as BTN_NORTH, BTN_WEST, BTN_SOUTH,
+BTN_EAST according to their physical location"). X sits at physical west
+→ BTN_WEST, Y at physical north → BTN_NORTH. If a button-visualizer script
+labels the west button "Square" and the north one "Triangle", the script's
+labels are backwards — the mapping is correct.
 
 | Button | HID bit | Linux evdev |
 |---|---|---|
@@ -46,9 +66,19 @@ zero extra code.
 Bits 2, 5, 12, 15 are unused (usages 3, 6, 13, 16 never set). The descriptor
 declares 16 one-bit buttons; the bit positions are chosen so the kernel maps
 them to modern gamepad names (HID Button usage N → evdev code 303+N). Plus a hat
-switch for the D-pad. L2/R2 are digital buttons in v1 — the v1.1 experiment
-that made them analog trigger axes (Xbox 360 layout) broke the right stick
-in-game, so it was reverted; the experiment is preserved in git history.
+switch for the D-pad.
+
+Full 9-byte report layout: `[LX, LY, RX, RY, L2, R2, hat+pad, btn_lo, btn_hi]`.
+
+**Re-pairing note:** the report grew from 7 to 9 data bytes, so the host's
+Bluetooth HID driver needs to re-read the descriptor. After installing this
+build, unpair (or forget) and re-pair the phone so the device comes up with
+the new layout.
+
+(Historical note: an earlier v1.1 experiment made L2/R2 analog trigger axes
+in an Xbox 360-style layout, but it moved the right stick to SDL axes 3/4 and
+broke in-game right-stick look, so it was reverted. This build keeps the
+v1.0 stick/axis layout and adds triggers via ABS_BRAKE/ABS_GAS instead.)
 
 ## Use it
 
