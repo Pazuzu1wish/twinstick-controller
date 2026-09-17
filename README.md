@@ -13,26 +13,25 @@ zero extra code.
 
 **Controls**
 
-- Left stick (X/Y) and right stick (Rx/Ry)
+- Left stick (X/Y) and right stick (Z/Rz)
 - D-pad (hat switch)
 - Face buttons: A B X Y (bottom/right/left/top diamond)
-- L1 / R1 bumpers, **analog** L2 / R2 triggers
+- L1 / L2 / R1 / R2 shoulder buttons (digital)
 - Start / Select, L3 / R3 stick clicks
 
-**HID layout** (v1.1+, Xbox 360 style, Report ID 1)
+**HID layout** (v1.0, Report ID 1 — known-good baseline)
 
 | SDL axis | Linux evdev | Control |
 |---|---|---|
 | 0 | ABS_X (−127..127) | Left stick X |
 | 1 | ABS_Y (−127..127) | Left stick Y |
-| 2 | ABS_Z (0..255) | L2 trigger |
-| 3 | ABS_RX (−127..127) | Right stick X |
-| 4 | ABS_RY (−127..127) | Right stick Y |
-| 5 | ABS_RZ (0..255) | R2 trigger |
+| 2 | ABS_Z (−127..127) | Right stick X |
+| 3 | ABS_RZ (−127..127) | Right stick Y |
 
-Buttons 0–9: A, B, X, Y, LB, RB, Select, Start, L3, R3. Plus a hat switch
-for the D-pad. Touchscreen triggers are full-pull only (0 or 255 — it's glass,
-not potentiometers).
+Buttons 0–11: A, B, X, Y, L1, R1, L2, R2, Select, Start, L3, R3. Plus a hat
+switch for the D-pad. L2/R2 are digital buttons in v1 — the v1.1 experiment
+that made them analog trigger axes (Xbox 360 layout) broke the right stick
+in-game, so it was reverted; the experiment is preserved in git history.
 
 ## Use it
 

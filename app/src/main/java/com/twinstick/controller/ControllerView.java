@@ -31,12 +31,11 @@ public class ControllerView extends View {
 
     // ---- HID state ----
     private int stickLX, stickLY, stickRX, stickRY; // -127..127
-    private int trigL, trigR; // analog triggers, 0..255
     private int hat = HidReport.HAT_NEUTRAL;
-    private int buttons; // 10-bit mask
+    private int buttons; // 16-bit mask (bits 0-11 used)
 
     public byte[] buildReport() {
-        return HidReport.build(stickLX, stickLY, trigL, stickRX, stickRY, trigR, hat, buttons);
+        return HidReport.build(stickLX, stickLY, stickRX, stickRY, hat, buttons);
     }
 
     // ---- geometry ----
@@ -54,7 +53,6 @@ public class ControllerView extends View {
     private int ptrStickL = -1, ptrStickR = -1;
     private float knobLX, knobLY, knobRX, knobRY; // knob offsets, pixels
     private final Map<Integer, Integer> ptrButton = new HashMap<>(); // pointerId -> button bit
-    private final Map<Integer, Integer> ptrTrigger = new HashMap<>(); // pointerId -> 0=L2, 1=R2
     private final Map<Integer, Integer> ptrDpad = new HashMap<>();   // pointerId -> dir flag
     private static final int D_UP = 1, D_RIGHT = 2, D_DOWN = 4, D_LEFT = 8;
 
@@ -114,16 +112,6 @@ public class ControllerView extends View {
         if (before != buttons) notifyChanged();
     }
 
-    private void setTrigger(int which, boolean pressed) {
-        // Touchscreen: triggers are full-pull only, 255 pressed / 0 released.
-        int v = pressed ? 255 : 0;
-        if (which == 0) {
-            if (trigL != v) { trigL = v; notifyChanged(); }
-        } else {
-            if (trigR != v) { trigR = v; notifyChanged(); }
-        }
-    }
-
     private boolean isPressed(int bit) { return (buttons & (1 << bit)) != 0; }
 
     private void notifyChanged() {
@@ -169,18 +157,13 @@ public class ControllerView extends View {
         if (dist(x, y, xX, xY) <= btnR * 1.25f) return HidReport.BTN_X;
         if (dist(x, y, yX, yY) <= btnR * 1.25f) return HidReport.BTN_Y;
         if (dist(x, y, l1x, l1y) <= btnR * 1.25f) return HidReport.BTN_L1;
+        if (dist(x, y, l2x, l2y) <= btnR * 1.25f) return HidReport.BTN_L2;
         if (dist(x, y, r1x, r1y) <= btnR * 1.25f) return HidReport.BTN_R1;
+        if (dist(x, y, r2x, r2y) <= btnR * 1.25f) return HidReport.BTN_R2;
         if (dist(x, y, selX, selY) <= smallR * 1.4f) return HidReport.BTN_SELECT;
         if (dist(x, y, stX, stY) <= smallR * 1.4f) return HidReport.BTN_START;
         if (dist(x, y, l3x, l3y) <= smallR * 1.4f) return HidReport.BTN_L3;
         if (dist(x, y, r3x, r3y) <= smallR * 1.4f) return HidReport.BTN_R3;
-        return -1;
-    }
-
-    /** Returns 0 for L2, 1 for R2, -1 otherwise. Triggers are analog axes, not buttons. */
-    private int triggerAt(float x, float y) {
-        if (dist(x, y, l2x, l2y) <= btnR * 1.25f) return 0;
-        if (dist(x, y, r2x, r2y) <= btnR * 1.25f) return 1;
         return -1;
     }
 
@@ -204,8 +187,6 @@ public class ControllerView extends View {
         }
         Integer bit = ptrButton.remove(pid);
         if (bit != null) setButtonBit(bit, false);
-        Integer trig = ptrTrigger.remove(pid);
-        if (trig != null) setTrigger(trig, false);
         if (ptrDpad.remove(pid) != null) updateHat();
     }
 
@@ -243,12 +224,8 @@ public class ControllerView extends View {
                     int dir = dpadAt(x, y);
                     if (dir != 0) { ptrDpad.put(pid, dir); updateHat(); }
                     else {
-                        int trig = triggerAt(x, y);
-                        if (trig >= 0) { ptrTrigger.put(pid, trig); setTrigger(trig, true); }
-                        else {
-                            int bit = buttonAt(x, y);
-                            if (bit >= 0) { ptrButton.put(pid, bit); setButtonBit(bit, true); }
-                        }
+                        int bit = buttonAt(x, y);
+                        if (bit >= 0) { ptrButton.put(pid, bit); setButtonBit(bit, true); }
                     }
                 }
                 break;
@@ -340,9 +317,9 @@ public class ControllerView extends View {
         drawButton(c, yX, yY, btnR, "Y", isPressed(HidReport.BTN_Y));
 
         drawButton(c, l1x, l1y, btnR, "L1", isPressed(HidReport.BTN_L1));
-        drawButton(c, l2x, l2y, btnR, "L2", trigL > 0);
+        drawButton(c, l2x, l2y, btnR, "L2", isPressed(HidReport.BTN_L2));
         drawButton(c, r1x, r1y, btnR, "R1", isPressed(HidReport.BTN_R1));
-        drawButton(c, r2x, r2y, btnR, "R2", trigR > 0);
+        drawButton(c, r2x, r2y, btnR, "R2", isPressed(HidReport.BTN_R2));
 
         drawButton(c, selX, selY, smallR, "SEL", isPressed(HidReport.BTN_SELECT));
         drawButton(c, stX, stY, smallR, "STA", isPressed(HidReport.BTN_START));
