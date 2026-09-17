@@ -18,3 +18,4 @@ local.properties
 .idea/
 *.iml
 .DS_Store
+*.class
