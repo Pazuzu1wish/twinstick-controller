@@ -41,19 +41,20 @@ L2/R2 are dual-reported: analog axes *and* digital button bits (8/9 →
 BTN_TL2/BTN_TR2). The Linux Gamepad Specification allows both:
 "Trigger buttons can be available as digital or analog buttons or both."
 
-A note on X/Y: action buttons are reported **by physical position** per the
-Linux Gamepad Specification ("reported as BTN_NORTH, BTN_WEST, BTN_SOUTH,
-BTN_EAST according to their physical location"). X sits at physical west
-→ BTN_WEST, Y at physical north → BTN_NORTH. If a button-visualizer script
-labels the west button "Square" and the north one "Triangle", the script's
-labels are backwards — the mapping is correct.
+A note on X/Y: the Linux Gamepad Specification wants action buttons reported by
+physical position, but games don't read the kernel — they read SDL. SDL's
+Linux gamepad heuristic and its mapping database were built around the xpad
+driver's legacy codes (Xbox 360's west "X" → BTN_X/0x133, north "Y" →
+BTN_Y/0x134), so SDL maps those codes into the west/north slots. We emit the
+xpad-legacy codes so X and Y land in the right SDL slots. X is the physical
+west button → BTN_X (0x133), Y the physical north button → BTN_Y (0x134).
 
 | Button | HID bit | Linux evdev |
 |---|---|---|
 | A (bottom) | 0 | BTN_SOUTH |
 | B (right) | 1 | BTN_EAST |
-| Y (top) | 3 | BTN_NORTH |
-| X (left) | 4 | BTN_WEST |
+| X (left) | 3 | BTN_X (0x133) |
+| Y (top) | 4 | BTN_Y (0x134) |
 | L1 | 6 | BTN_TL |
 | R1 | 7 | BTN_TR |
 | L2 | 8 | BTN_TL2 |
@@ -70,10 +71,10 @@ switch for the D-pad.
 
 Full 9-byte report layout: `[LX, LY, RX, RY, L2, R2, hat+pad, btn_lo, btn_hi]`.
 
-**Re-pairing note:** the report grew from 7 to 9 data bytes, so the host's
-Bluetooth HID driver needs to re-read the descriptor. After installing this
-build, unpair (or forget) and re-pair the phone so the device comes up with
-the new layout.
+**Re-pairing note:** the v6 report grew from 7 to 9 data bytes, so installing v6
+required an unpair/re-pair so the host re-reads the descriptor. The v7 update
+changed only which button bit X/Y set (descriptor and layout untouched) — no
+re-pair needed, just reinstall the APK.
 
 (Historical note: an earlier v1.1 experiment made L2/R2 analog trigger axes
 in an Xbox 360-style layout, but it moved the right stick to SDL axes 3/4 and

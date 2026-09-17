@@ -24,18 +24,17 @@ package com.twinstick.controller;
  *   RIGHTTRIGGER from those codes (Android convention), leaving our right
  *   stick alone on ABS_Z/ABS_RZ.
  *
- * X/Y are positional, not labeled: the Linux Gamepad Specification mandates that
- * action buttons "are reported as BTN_NORTH, BTN_WEST, BTN_SOUTH, BTN_EAST
- * according to their physical location." Our X button sits at physical west
- * (usage 5 -> BTN_WEST) and Y at physical north (usage 4 -> BTN_NORTH), which
- * is correct per the spec; a visualizer labeling west as "Square" and north as
- * "Triangle" has its own labels backwards, not the mapping.
+ * X/Y deliberately use xpad-legacy codes, not spec-positional ones: the kernel
+ * gamepad spec wants face buttons by physical position, but games read SDL,
+ * not the kernel. SDL's Linux heuristic was built around xpad's legacy
+ * mapping (west "X" -> 0x133, north "Y" -> 0x134), so emitting legacy codes
+ * is what lands in the right SDL slots. Our X is physical west, Y north.
  *
  * Button map (bit -> button -> Linux evdev code).
  * Bit positions are chosen so the kernel names them like a modern gamepad:
  * HID Button-page usage N (bit N-1) maps to evdev code 303+N.
  *   0=A(bottom) -> BTN_SOUTH, 1=B(right) -> BTN_EAST,
- *   3=Y(top) -> BTN_NORTH,    4=X(left) -> BTN_WEST,
+ *   3=X(left) -> BTN_X (0x133), 4=Y(top) -> BTN_Y (0x134),
  *   6=L1 -> BTN_TL, 7=R1 -> BTN_TR, 8=L2 -> BTN_TL2, 9=R2 -> BTN_TR2,
  *   10=Select -> BTN_SELECT, 11=Start -> BTN_START,
  *   13=L3 -> BTN_THUMBL, 14=R3 -> BTN_THUMBR
@@ -105,8 +104,8 @@ public final class HidReport {
     // HID Button-page usage N (bit N-1) -> evdev code 303+N.
     public static final int BTN_A = 0;       // usage 1  -> BTN_SOUTH
     public static final int BTN_B = 1;       // usage 2  -> BTN_EAST
-    public static final int BTN_Y = 3;       // usage 4  -> BTN_NORTH
-    public static final int BTN_X = 4;       // usage 5  -> BTN_WEST
+    public static final int BTN_X = 3;       // usage 4  -> BTN_X (0x133); physical west button, legacy xpad code for SDL
+    public static final int BTN_Y = 4;       // usage 5  -> BTN_Y (0x134); physical north button, legacy xpad code for SDL
     public static final int BTN_L1 = 6;      // usage 7  -> BTN_TL
     public static final int BTN_R1 = 7;      // usage 8  -> BTN_TR
     public static final int BTN_L2 = 8;      // usage 9  -> BTN_TL2
