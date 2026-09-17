@@ -15,7 +15,7 @@ import java.util.Map;
  *   left stick (bottom-left), D-pad above it (mid-left)
  *   right stick (bottom-right), 4 face buttons in diamond above it (mid-right)
  *   L1/L2 stacked on top-left edge, R1/R2 stacked on top-right edge
- *   Start/Select small buttons top-center, L3/R3 next to the sticks
+ *   Start/Select small buttons top-center, L3/R3 just above the sticks
  * Multi-touch: each pointer is tracked independently per control.
  */
 public class ControllerView extends View {
@@ -70,7 +70,7 @@ public class ControllerView extends View {
     @Override
     protected void onSizeChanged(int w, int h, int oldW, int oldH) {
         W = w; H = h;
-        stickR = H * 0.17f;
+        stickR = H * 0.195f;   // +15% vs v1.0 for fatter thumbs
         knobR = stickR * 0.45f;
         btnR = H * 0.062f;
         smallR = H * 0.045f;
@@ -80,24 +80,26 @@ public class ControllerView extends View {
 
         lSx = W * 0.135f; lSy = H * 0.70f;
         rSx = W * 0.865f; rSy = H * 0.70f;
-        dCx = W * 0.135f; dCy = H * 0.30f;
-        fCx = W * 0.865f; fCy = H * 0.30f;
+        dCx = W * 0.215f; dCy = H * 0.30f;   // d-pad nudged inward (+8% W)
+        fCx = W * 0.785f; fCy = H * 0.30f;   // face diamond nudged inward (-8% W)
         float spread = H * 0.115f;
         aX = fCx;        aY = fCy + spread; // bottom
         bX = fCx + spread; bY = fCy;        // right
         xX = fCx - spread; xY = fCy;        // left
         yX = fCx;        yY = fCy - spread; // top
 
-        l1x = W * 0.055f; l1y = H * 0.10f;
-        l2x = W * 0.055f; l2y = H * 0.26f;
-        r1x = W * 0.945f; r1y = H * 0.10f;
-        r2x = W * 0.945f; r2y = H * 0.26f;
+        l1x = W * 0.048f; l1y = H * 0.09f;    // nudged up/out for clearance
+        l2x = W * 0.048f; l2y = H * 0.235f;   // clear of the d-pad's left arm
+        r1x = W * 0.952f; r1y = H * 0.09f;
+        r2x = W * 0.952f; r2y = H * 0.235f;   // clear of the face diamond
 
         selX = W * 0.455f; selY = H * 0.09f;
         stX = W * 0.545f;  stY = H * 0.09f;
 
-        l3x = W * 0.030f; l3y = H * 0.70f;
-        r3x = W * 0.970f; r3y = H * 0.70f;
+        // L3/R3 sit just above their sticks: with the bigger sticks there is no
+        // room left at the outer edges (they would clip off-screen at 16:9).
+        l3x = lSx; l3y = lSy - stickR - smallR - H * 0.025f;
+        r3x = rSx; r3y = rSy - stickR - smallR - H * 0.025f;
     }
 
     private static float dist(float x1, float y1, float x2, float y2) {
