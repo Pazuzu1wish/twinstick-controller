@@ -1,0 +1,20 @@
+# Gradle / Android build outputs
+.gradle/
+build/
+**/build/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Signing keys — never commit these
+*.jks
+*.keystore
+
+# Local SDK paths
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
