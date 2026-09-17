@@ -28,7 +28,24 @@ zero extra code.
 | 2 | ABS_Z (−127..127) | Right stick X |
 | 3 | ABS_RZ (−127..127) | Right stick Y |
 
-Buttons 0–11: A, B, X, Y, L1, R1, L2, R2, Select, Start, L3, R3. Plus a hat
+| Button | HID bit | Linux evdev |
+|---|---|---|
+| A (bottom) | 0 | BTN_SOUTH |
+| B (right) | 1 | BTN_EAST |
+| Y (top) | 3 | BTN_NORTH |
+| X (left) | 4 | BTN_WEST |
+| L1 | 6 | BTN_TL |
+| R1 | 7 | BTN_TR |
+| L2 | 8 | BTN_TL2 |
+| R2 | 9 | BTN_TR2 |
+| Select | 10 | BTN_SELECT |
+| Start | 11 | BTN_START |
+| L3 | 13 | BTN_THUMBL |
+| R3 | 14 | BTN_THUMBR |
+
+Bits 2, 5, 12, 15 are unused (usages 3, 6, 13, 16 never set). The descriptor
+declares 16 one-bit buttons; the bit positions are chosen so the kernel maps
+them to modern gamepad names (HID Button usage N → evdev code 303+N). Plus a hat
 switch for the D-pad. L2/R2 are digital buttons in v1 — the v1.1 experiment
 that made them analog trigger axes (Xbox 360 layout) broke the right stick
 in-game, so it was reverted; the experiment is preserved in git history.

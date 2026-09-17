@@ -32,7 +32,7 @@ public class ControllerView extends View {
     // ---- HID state ----
     private int stickLX, stickLY, stickRX, stickRY; // -127..127
     private int hat = HidReport.HAT_NEUTRAL;
-    private int buttons; // 16-bit mask (bits 0-11 used)
+    private int buttons; // 16-bit mask (bits 0,1,3,4,6-11,13,14 used)
 
     public byte[] buildReport() {
         return HidReport.build(stickLX, stickLY, stickRX, stickRY, hat, buttons);

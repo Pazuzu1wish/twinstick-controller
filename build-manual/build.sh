@@ -26,7 +26,7 @@ $BT/aapt2 link -o "$OUT/base.apk" \
   -I "$SDK/platforms/android-34/android.jar" \
   --manifest "$PROJ/app/src/main/AndroidManifest.xml" \
   --min-sdk-version 28 --target-sdk-version 34 \
-  --version-code 4 --version-name "1.0"
+  --version-code 5 --version-name "1.0"
 
 echo "== add classes.dex =="
 (cd "$OUT/dex" && zip -q "$OUT/base.apk" classes.dex)

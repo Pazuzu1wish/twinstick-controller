@@ -12,8 +12,16 @@ package com.twinstick.controller;
  *   byte 5: buttons 1-8  (bit0 = button 1)
  *   byte 6: buttons 9-16 (bit0 = button 9)
  *
- * Button map: 1=A(bottom) 2=B(right) 3=X(left) 4=Y(top)
- *             5=L1 6=R1 7=L2 8=R2 9=Select 10=Start 11=L3 12=R3
+ * Button map (bit -> button -> Linux evdev code).
+ * Bit positions are chosen so the kernel names them like a modern gamepad:
+ * HID Button-page usage N (bit N-1) maps to evdev code 303+N.
+ *   0=A(bottom) -> BTN_SOUTH, 1=B(right) -> BTN_EAST,
+ *   3=Y(top) -> BTN_NORTH,    4=X(left) -> BTN_WEST,
+ *   6=L1 -> BTN_TL, 7=R1 -> BTN_TR, 8=L2 -> BTN_TL2, 9=R2 -> BTN_TR2,
+ *   10=Select -> BTN_SELECT, 11=Start -> BTN_START,
+ *   13=L3 -> BTN_THUMBL, 14=R3 -> BTN_THUMBR
+ * Bits 2, 5, 12, 15 (usages 3, 6, 13, 16) are unused and stay 0.
+ * The descriptor still declares 16 one-bit buttons; only the mapping changed.
  */
 public final class HidReport {
 
@@ -64,18 +72,21 @@ public final class HidReport {
     public static final int REPORT_LEN = 7;
 
     // Button bit positions (0-based) in the 16-bit button field.
-    public static final int BTN_A = 0;
-    public static final int BTN_B = 1;
-    public static final int BTN_X = 2;
-    public static final int BTN_Y = 3;
-    public static final int BTN_L1 = 4;
-    public static final int BTN_R1 = 5;
-    public static final int BTN_L2 = 6;
-    public static final int BTN_R2 = 7;
-    public static final int BTN_SELECT = 8;
-    public static final int BTN_START = 9;
-    public static final int BTN_L3 = 10;
-    public static final int BTN_R3 = 11;
+    // Chosen so the Linux kernel maps them to modern gamepad BTN_ codes:
+    // HID Button-page usage N (bit N-1) -> evdev code 303+N.
+    public static final int BTN_A = 0;       // usage 1  -> BTN_SOUTH
+    public static final int BTN_B = 1;       // usage 2  -> BTN_EAST
+    public static final int BTN_Y = 3;       // usage 4  -> BTN_NORTH
+    public static final int BTN_X = 4;       // usage 5  -> BTN_WEST
+    public static final int BTN_L1 = 6;      // usage 7  -> BTN_TL
+    public static final int BTN_R1 = 7;      // usage 8  -> BTN_TR
+    public static final int BTN_L2 = 8;      // usage 9  -> BTN_TL2
+    public static final int BTN_R2 = 9;      // usage 10 -> BTN_TR2
+    public static final int BTN_SELECT = 10; // usage 11 -> BTN_SELECT
+    public static final int BTN_START = 11;  // usage 12 -> BTN_START
+    public static final int BTN_L3 = 13;     // usage 14 -> BTN_THUMBL
+    public static final int BTN_R3 = 14;     // usage 15 -> BTN_THUMBR
+    // bits 2, 5, 12, 15 unused -> usages 3, 6, 13, 16 are never set
 
     public static final int HAT_NEUTRAL = 8;
 
