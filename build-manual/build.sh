@@ -11,7 +11,7 @@ OUT=/tmp/build-twinstick-v1
 rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/dex"
 
 echo "== javac =="
-$JDK/bin/javac -source 17 -target 17 \
+$JDK/bin/javac -encoding UTF-8 -source 17 -target 17 \
   -classpath "$SDK/platforms/android-34/android.jar" \
   -d "$OUT/classes" \
   "$PROJ/app/src/main/java/com/twinstick/controller/"*.java
@@ -25,8 +25,9 @@ echo "== aapt2 link =="
 $BT/aapt2 link -o "$OUT/base.apk" \
   -I "$SDK/platforms/android-34/android.jar" \
   --manifest "$PROJ/app/src/main/AndroidManifest.xml" \
+  -A "$PROJ/app/src/main/assets" \
   --min-sdk-version 28 --target-sdk-version 34 \
-  --version-code 7 --version-name "1.0"
+  --version-code 8 --version-name "1.0"
 
 echo "== add classes.dex =="
 (cd "$OUT/dex" && zip -q "$OUT/base.apk" classes.dex)

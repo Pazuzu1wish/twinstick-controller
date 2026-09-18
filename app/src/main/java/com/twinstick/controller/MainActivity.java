@@ -32,6 +32,7 @@ public class MainActivity extends Activity {
     private static final int REQ_BT_PERMS = 1;
     private static final int REQ_ENABLE_BT = 2;
     private static final int REQ_DISCOVERABLE = 3;
+    private static final int REQ_PROFILES = 4;
     private static final long PROXY_TIMEOUT_MS = 12000;
 
     private TextView statusText;
@@ -41,8 +42,13 @@ public class MainActivity extends Activity {
     private BluetoothAdapter btAdapter;
     private BluetoothHidDevice hidDevice;
     private BluetoothDevice hostDevice;
-    private byte[] lastReport = new byte[HidReport.REPORT_LEN];
+    private byte[] lastReport = new byte[9];
     private boolean dirty;
+    private boolean appRegistered;
+    private boolean pendingProfileSwitch;
+
+    private HidProfile activeProfile;
+    private HidReport hidReport;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable sendLoop = new Runnable() {
@@ -91,8 +97,15 @@ public class MainActivity extends Activity {
         enableButton.setOnClickListener(v -> onEnableClicked());
         topBar.addView(enableButton);
 
+        Button settingsButton = new Button(this);
+        settingsButton.setText("Profiles");
+        settingsButton.setOnClickListener(v -> startActivityForResult(
+                new Intent(this, ProfilesActivity.class), REQ_PROFILES));
+        topBar.addView(settingsButton);
+
         controllerView = new ControllerView(this);
         controllerView.setListener(() -> dirty = true);
+        reloadProfile(); // active profile -> packer -> ControllerView
 
         root.addView(topBar, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -133,6 +146,33 @@ public class MainActivity extends Activity {
 
     private void setStatus(final String s) {
         runOnUiThread(() -> statusText.setText(s));
+    }
+
+    /** Load the active profile, build its packer, and hand it to the view. */
+    private void reloadProfile() {
+        activeProfile = ProfileStore.getActive(this);
+        hidReport = new HidReport(activeProfile);
+        controllerView.setHidReport(hidReport);
+        lastReport = new byte[hidReport.getReportLength()];
+        dirty = true;
+    }
+
+    /** Called when returning from ProfilesActivity with a changed profile. */
+    private void onProfileChanged() {
+        reloadProfile();
+        if (appRegistered && hidDevice != null) {
+            // The SDP record carries the descriptor: unregister, then
+            // re-register with the new one. The host must reconnect.
+            pendingProfileSwitch = true;
+            try {
+                hidDevice.unregisterApp();
+            } catch (Exception e) {
+                pendingProfileSwitch = false;
+                setStatus("Profile switch failed: " + e.getMessage());
+            }
+        } else {
+            setStatus("Profile switched to \"" + activeProfile.name + "\".");
+        }
     }
 
     private void onEnableClicked() {
@@ -181,6 +221,11 @@ public class MainActivity extends Activity {
             else setStatus("Bluetooth not enabled.");
         } else if (code == REQ_DISCOVERABLE) {
             registerHidApp();
+        } else if (code == REQ_PROFILES) {
+            if (result == RESULT_OK && data != null
+                    && data.getBooleanExtra(ProfilesActivity.EXTRA_PROFILE_CHANGED, false)) {
+                onProfileChanged();
+            }
         }
     }
 
@@ -193,14 +238,7 @@ public class MainActivity extends Activity {
             @Override public void onServiceConnected(int profile, BluetoothProfile proxy) {
                 handler.removeCallbacks(proxyTimeout);
                 hidDevice = (BluetoothHidDevice) proxy;
-                BluetoothHidDeviceAppSdpSettings sdp =
-                        new BluetoothHidDeviceAppSdpSettings(
-                                "TwinStick Controller",
-                                "TwinStick Bluetooth gamepad",
-                                "TwinStick",
-                                BluetoothHidDevice.SUBCLASS2_GAMEPAD,
-                                HidReport.DESCRIPTOR);
-                boolean ok = hidDevice.registerApp(sdp, null, null,
+                boolean ok = hidDevice.registerApp(buildSdpSettings(), null, null,
                         getMainExecutor(), hidCallback);
                 if (!ok) {
                     setStatus("registerApp failed: HID device role unavailable.");
@@ -211,14 +249,43 @@ public class MainActivity extends Activity {
         }, BluetoothProfile.HID_DEVICE);
     }
 
+    /** SDP settings for the active profile (descriptor bytes come from the profile). */
+    private BluetoothHidDeviceAppSdpSettings buildSdpSettings() {
+        return new BluetoothHidDeviceAppSdpSettings(
+                "TwinStick Controller",
+                "TwinStick Bluetooth gamepad (" + activeProfile.name + ")",
+                "TwinStick",
+                BluetoothHidDevice.SUBCLASS2_GAMEPAD,
+                hidReport.getDescriptor());
+    }
+
     private final BluetoothHidDevice.Callback hidCallback = new BluetoothHidDevice.Callback() {
         @Override
         public void onAppStatusChanged(BluetoothDevice device, boolean registered) {
             if (registered) {
-                setStatus("Waiting for host - pair from the PC's Bluetooth settings.");
+                appRegistered = true;
+                if (pendingProfileSwitch) {
+                    pendingProfileSwitch = false;
+                    setStatus("Profile switched to \"" + activeProfile.name +
+                            "\" — reconnect from the host to pick up the new descriptor.");
+                } else {
+                    setStatus("Waiting for host - pair from the PC's Bluetooth settings.");
+                }
             } else {
-                setStatus("HID app unregistered.");
-                runOnUiThread(() -> enableButton.setEnabled(true));
+                appRegistered = false;
+                if (pendingProfileSwitch) {
+                    // Our own unregister for a profile switch: re-register now
+                    // with the new descriptor.
+                    if (hidDevice != null) {
+                        hidDevice.registerApp(buildSdpSettings(), null, null,
+                                getMainExecutor(), hidCallback);
+                    } else {
+                        pendingProfileSwitch = false;
+                    }
+                } else {
+                    setStatus("HID app unregistered.");
+                    runOnUiThread(() -> enableButton.setEnabled(true));
+                }
             }
         }
 

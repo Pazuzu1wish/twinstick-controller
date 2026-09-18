@@ -24,22 +24,60 @@ public class ControllerView extends View {
         void onStateChanged();
     }
 
-    private static final int DEADZONE = 8; // of 127
-
     private Listener listener;
     public void setListener(Listener l) { listener = l; }
 
-    // ---- HID state ----
-    private int stickLX, stickLY, stickRX, stickRY; // -127..127
+    // ---- HID state (profile-driven; no hardcoded positions) ----
+    private HidReport report;
+    private int stickLX, stickLY, stickRX, stickRY; // raw -127..127 (profile deadzone applied at pack time)
     private int hat = HidReport.HAT_NEUTRAL;
-    private int buttons; // 16-bit mask (bits 0,1,3,4,6-11,13,14 used)
+    private int buttons; // bit i = profile button index i
+
+    // Cached profile positions; -1 if the profile lacks the control.
+    private int bitA = -1, bitB = -1, bitX = -1, bitY = -1;
+    private int bitL1 = -1, bitR1 = -1, bitL2 = -1, bitR2 = -1;
+    private int bitSel = -1, bitStart = -1, bitL3 = -1, bitR3 = -1;
+    private int axLX = -1, axLY = -1, axRX = -1, axRY = -1, axL2 = -1, axR2 = -1;
+
+    /** Install the active profile's packer. Resets all input state. */
+    public void setHidReport(HidReport r) {
+        report = r;
+        buttons = 0;
+        hat = HidReport.HAT_NEUTRAL;
+        stickLX = stickLY = stickRX = stickRY = 0;
+        knobLX = knobLY = knobRX = knobRY = 0;
+        ptrButton.clear();
+        ptrDpad.clear();
+        ptrStickL = ptrStickR = -1;
+        if (r != null) {
+            bitA = r.buttonBit("A"); bitB = r.buttonBit("B");
+            bitX = r.buttonBit("X"); bitY = r.buttonBit("Y");
+            bitL1 = r.buttonBit("L1"); bitR1 = r.buttonBit("R1");
+            bitL2 = r.buttonBit("L2"); bitR2 = r.buttonBit("R2");
+            bitSel = r.buttonBit("SELECT"); bitStart = r.buttonBit("START");
+            bitL3 = r.buttonBit("L3"); bitR3 = r.buttonBit("R3");
+            axLX = r.axisIndex("left_x"); axLY = r.axisIndex("left_y");
+            axRX = r.axisIndex("right_x"); axRY = r.axisIndex("right_y");
+            axL2 = r.axisIndex("l2"); axR2 = r.axisIndex("r2");
+        }
+        invalidate();
+    }
 
     public byte[] buildReport() {
-        // L2/R2 are dual-reported: digital button bits (BTN_TL2/BTN_TR2) plus
-        // analog trigger axes (255 pressed / 0 released).
-        int trigL2 = (buttons & (1 << HidReport.BTN_L2)) != 0 ? 255 : 0;
-        int trigR2 = (buttons & (1 << HidReport.BTN_R2)) != 0 ? 255 : 0;
-        return HidReport.build(stickLX, stickLY, stickRX, stickRY, trigL2, trigR2, hat, buttons);
+        if (report == null) return new byte[0];
+        int n = report.getAxisCount();
+        int[] raw = new int[n];
+        if (axLX >= 0) raw[axLX] = stickLX;
+        if (axLY >= 0) raw[axLY] = stickLY;
+        if (axRX >= 0) raw[axRX] = stickRX;
+        if (axRY >= 0) raw[axRY] = stickRY;
+        // L2/R2 are dual-reported: the touch zones drive both the button
+        // entries and the analog trigger axes (pressed -> max, released -> min).
+        if (axL2 >= 0) raw[axL2] = isPressed(bitL2)
+                ? report.axisMax(axL2) : report.axisMin(axL2);
+        if (axR2 >= 0) raw[axR2] = isPressed(bitR2)
+                ? report.axisMax(axR2) : report.axisMin(axR2);
+        return report.build(raw, hat, buttons);
     }
 
     // ---- geometry ----
@@ -118,7 +156,9 @@ public class ControllerView extends View {
         if (before != buttons) notifyChanged();
     }
 
-    private boolean isPressed(int bit) { return (buttons & (1 << bit)) != 0; }
+    private boolean isPressed(int bit) {
+        return bit >= 0 && (buttons & (1 << bit)) != 0;
+    }
 
     private void notifyChanged() {
         if (listener != null) listener.onStateChanged();
@@ -126,10 +166,11 @@ public class ControllerView extends View {
     }
 
     private int axisValue(float offsetPx) {
+        // Raw -127..127; the profile's deadzone/invert/clamp are applied when
+        // the report is packed.
         int v = Math.round(127f * offsetPx / stickR);
         if (v > 127) v = 127;
         if (v < -127) v = -127;
-        if (Math.abs(v) < DEADZONE) v = 0;
         return v;
     }
 
@@ -156,20 +197,20 @@ public class ControllerView extends View {
         if (newHat != hat) { hat = newHat; notifyChanged(); }
     }
 
-    /** Returns button bit for a tap, or -1. Checks face, shoulders, start/select, L3/R3. */
+    /** Returns the profile button bit for a tap, or -1. Checks face, shoulders, start/select, L3/R3. */
     private int buttonAt(float x, float y) {
-        if (dist(x, y, aX, aY) <= btnR * 1.25f) return HidReport.BTN_A;
-        if (dist(x, y, bX, bY) <= btnR * 1.25f) return HidReport.BTN_B;
-        if (dist(x, y, xX, xY) <= btnR * 1.25f) return HidReport.BTN_X;
-        if (dist(x, y, yX, yY) <= btnR * 1.25f) return HidReport.BTN_Y;
-        if (dist(x, y, l1x, l1y) <= btnR * 1.25f) return HidReport.BTN_L1;
-        if (dist(x, y, l2x, l2y) <= btnR * 1.25f) return HidReport.BTN_L2;
-        if (dist(x, y, r1x, r1y) <= btnR * 1.25f) return HidReport.BTN_R1;
-        if (dist(x, y, r2x, r2y) <= btnR * 1.25f) return HidReport.BTN_R2;
-        if (dist(x, y, selX, selY) <= smallR * 1.4f) return HidReport.BTN_SELECT;
-        if (dist(x, y, stX, stY) <= smallR * 1.4f) return HidReport.BTN_START;
-        if (dist(x, y, l3x, l3y) <= smallR * 1.4f) return HidReport.BTN_L3;
-        if (dist(x, y, r3x, r3y) <= smallR * 1.4f) return HidReport.BTN_R3;
+        if (bitA >= 0 && dist(x, y, aX, aY) <= btnR * 1.25f) return bitA;
+        if (bitB >= 0 && dist(x, y, bX, bY) <= btnR * 1.25f) return bitB;
+        if (bitX >= 0 && dist(x, y, xX, xY) <= btnR * 1.25f) return bitX;
+        if (bitY >= 0 && dist(x, y, yX, yY) <= btnR * 1.25f) return bitY;
+        if (bitL1 >= 0 && dist(x, y, l1x, l1y) <= btnR * 1.25f) return bitL1;
+        if (bitL2 >= 0 && dist(x, y, l2x, l2y) <= btnR * 1.25f) return bitL2;
+        if (bitR1 >= 0 && dist(x, y, r1x, r1y) <= btnR * 1.25f) return bitR1;
+        if (bitR2 >= 0 && dist(x, y, r2x, r2y) <= btnR * 1.25f) return bitR2;
+        if (bitSel >= 0 && dist(x, y, selX, selY) <= smallR * 1.4f) return bitSel;
+        if (bitStart >= 0 && dist(x, y, stX, stY) <= smallR * 1.4f) return bitStart;
+        if (bitL3 >= 0 && dist(x, y, l3x, l3y) <= smallR * 1.4f) return bitL3;
+        if (bitR3 >= 0 && dist(x, y, r3x, r3y) <= smallR * 1.4f) return bitR3;
         return -1;
     }
 
@@ -317,19 +358,19 @@ public class ControllerView extends View {
         drawStick(c, lSx, lSy, knobLX, knobLY);
         drawStick(c, rSx, rSy, knobRX, knobRY);
 
-        drawButton(c, aX, aY, btnR, "A", isPressed(HidReport.BTN_A));
-        drawButton(c, bX, bY, btnR, "B", isPressed(HidReport.BTN_B));
-        drawButton(c, xX, xY, btnR, "X", isPressed(HidReport.BTN_X));
-        drawButton(c, yX, yY, btnR, "Y", isPressed(HidReport.BTN_Y));
+        drawButton(c, aX, aY, btnR, "A", isPressed(bitA));
+        drawButton(c, bX, bY, btnR, "B", isPressed(bitB));
+        drawButton(c, xX, xY, btnR, "X", isPressed(bitX));
+        drawButton(c, yX, yY, btnR, "Y", isPressed(bitY));
 
-        drawButton(c, l1x, l1y, btnR, "L1", isPressed(HidReport.BTN_L1));
-        drawButton(c, l2x, l2y, btnR, "L2", isPressed(HidReport.BTN_L2));
-        drawButton(c, r1x, r1y, btnR, "R1", isPressed(HidReport.BTN_R1));
-        drawButton(c, r2x, r2y, btnR, "R2", isPressed(HidReport.BTN_R2));
+        drawButton(c, l1x, l1y, btnR, "L1", isPressed(bitL1));
+        drawButton(c, l2x, l2y, btnR, "L2", isPressed(bitL2));
+        drawButton(c, r1x, r1y, btnR, "R1", isPressed(bitR1));
+        drawButton(c, r2x, r2y, btnR, "R2", isPressed(bitR2));
 
-        drawButton(c, selX, selY, smallR, "SEL", isPressed(HidReport.BTN_SELECT));
-        drawButton(c, stX, stY, smallR, "STA", isPressed(HidReport.BTN_START));
-        drawButton(c, l3x, l3y, smallR, "L3", isPressed(HidReport.BTN_L3));
-        drawButton(c, r3x, r3y, smallR, "R3", isPressed(HidReport.BTN_R3));
+        drawButton(c, selX, selY, smallR, "SEL", isPressed(bitSel));
+        drawButton(c, stX, stY, smallR, "STA", isPressed(bitStart));
+        drawButton(c, l3x, l3y, smallR, "L3", isPressed(bitL3));
+        drawButton(c, r3x, r3y, smallR, "R3", isPressed(bitR3));
     }
 }

@@ -20,7 +20,66 @@ zero extra code.
 - L2 / R2 triggers: analog axes (0–255) **and** digital buttons
 - Start / Select, L3 / R3 stick clicks
 
-**HID layout** (Report ID 1, 9 data bytes)
+## HID profiles (mappable schema)
+
+The button/axis mapping is no longer baked into the app — it lives in JSON
+**profiles** that the app loads at runtime, so mapping tweaks never need a
+rebuild again. Tap **Profiles** on the controller screen to switch, edit,
+duplicate, import, or export them.
+
+**Bundled profiles**
+
+- **SDL xpad-legacy** (default): the mapping every build up to v7 used —
+  X (west) → BTN_X/0x133, Y (north) → BTN_Y/0x134, triggers on ABS_BRAKE/ABS_GAS.
+- **Linux spec positional**: identical, except X → usage 5 (BTN_Y/0x134) and
+  Y → usage 4 (BTN_X/0x133), i.e. buttons strictly by physical position per
+  the kernel's gamepad spec. (SDL's heuristic expects the xpad-legacy codes,
+  so this one will look X/Y-swapped in SDL consumers — it's here for
+  experimenting, not for playing.)
+
+**Profile format**
+
+```json
+{
+  "profile_name": "SDL xpad-legacy",
+  "vendor_id": "0x045E",
+  "product_id": "0x02EA",
+  "buttons": [
+    {"id": "A", "page": "button", "usage": 1},
+    {"id": "X", "page": "button", "usage": 4}
+  ],
+  "axes": [
+    {"id": "left_x", "page": "generic_desktop", "usage": 48,
+     "min": -127, "max": 127, "invert": false, "deadzone": 0.08},
+    {"id": "l2", "page": "simulation", "usage": 197,
+     "min": 0, "max": 255, "invert": false, "deadzone": 0.0}
+  ],
+  "hat": {"page": "generic_desktop", "usage": 57}
+}
+```
+
+- The physical control set is fixed (12 buttons, 6 axes, hat — it mirrors the
+  touchscreen UI); a profile only remaps usages and axis parameters.
+- Page names: `generic_desktop` (0x01), `simulation` (0x02), `button` (0x09).
+  Usage numbers are decimal (48 = 0x30 X, 197 = 0xC5 Brake, …).
+- The HID descriptor is generated from the profile at runtime: one 8-bit
+  field per axis in order, then the hat byte, then the button bytes LSB-first
+  in profile order. The report layout always mirrors the declaration order.
+- Axis conditioning: deadzone (fraction of half-range, snaps to the resting
+  value) → invert → clamp to [min, max].
+- `vendor_id`/`product_id` are stored and exported but informational only —
+  Android's `BluetoothHidDevice` API doesn't let apps set VID/PID.
+- Imports are validated (unknown ids, duplicate usages, bad ranges, …) and
+  rejected with a plain-English reason.
+
+**Switching profiles:** the Bluetooth SDP record carries the descriptor, so
+switching re-registers the HID app and the **host must reconnect** to pick up
+the new descriptor (unpair/re-pair if the report layout changed). The app
+tells you when this is needed.
+
+## HID layout (default profile)
+
+Report ID 1, 9 data bytes: `[LX, LY, RX, RY, L2, R2, hat+pad, btn_lo, btn_hi]`.
 
 | SDL axis | Linux evdev | Control |
 |---|---|---|
@@ -74,7 +133,11 @@ Full 9-byte report layout: `[LX, LY, RX, RY, L2, R2, hat+pad, btn_lo, btn_hi]`.
 **Re-pairing note:** the v6 report grew from 7 to 9 data bytes, so installing v6
 required an unpair/re-pair so the host re-reads the descriptor. The v7 update
 changed only which button bit X/Y set (descriptor and layout untouched) — no
-re-pair needed, just reinstall the APK.
+re-pair needed, just reinstall the APK. **v8 adds profile switching: changing
+profiles re-registers the HID app, so the host must reconnect** (and if the
+new profile changes the report layout, unpair/re-pair). The default v8
+profile is byte-for-byte the v7 mapping, so installing v8 over v7 needs no
+re-pair until you actually switch profiles.
 
 (Historical note: an earlier v1.1 experiment made L2/R2 analog trigger axes
 in an Xbox 360-style layout, but it moved the right stick to SDL axes 3/4 and
